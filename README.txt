@@ -1,6 +1,9 @@
 EUTYCHUS - A free Church service recording plug-in for
 Audacity(R) Digital Audio Editor
 
+EUTYCHUS source is copyright (c) 2013 Stephen Parry,
+some elements copyright (c) 1999-2013 by Audaicty Team.
+
 "Audacity" is a registered trademark of Dominic Mazzoni.
 
 1. Licensing
