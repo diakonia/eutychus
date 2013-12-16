@@ -36,7 +36,7 @@ enum {
 	readingsBoxID,
 	markSectionStartButtonID,
 	sectionStartBoxID,
-	sectionChoiceID,
+	sectionComboID,
 	markSectionEndButtonID,
 	sectionEndBoxID,
 };
@@ -47,8 +47,9 @@ EVT_BUTTON(saveButtonID, EutychusPanel::onSaveButtonClick)
 EVT_BUTTON(testButtonID, EutychusPanel::onTestButtonClick)
 EVT_BUTTON(markSectionStartButtonID, EutychusPanel::onMarkSectionStartButtonClick)
 EVT_BUTTON(markSectionEndButtonID, EutychusPanel::onMarkSectionEndButtonClick)
-// EVT_COMBOBOX(sectionChoiceID,EutychusPanel::onChooseSectionComboClick)
-// EVT_DATE_CHANGED(serviceStartDatePickerID,EutychusPanel::onServiceStartDateChange)
+EVT_COMBOBOX(sectionComboID,EutychusPanel::onSectionComboClick)
+EVT_CHOICE(amPmChoiceID,EutychusPanel::onAmPmChoiceClick)
+EVT_DATE_CHANGED(serviceStartDatePickerID,EutychusPanel::onServiceStartDateChange)
 EVT_CLOSE(EutychusPanel::OnClose)
 END_EVENT_TABLE()
 
@@ -159,7 +160,7 @@ serviceSections()
 				//				S.Id(testID).AddButton(_("&Test"));
 			}
 			S.EndMultiColumn();
-			sectionChoice = S.Id(sectionChoiceID).AddCombo(_("Section") + wxString(wxT(":")),sections[0],&sections);
+			sectionChoice = S.Id(sectionComboID).AddCombo(_("Section") + wxString(wxT(":")),sections[0],&sections);
 			S.Id(-1).AddPrompt(_("Times") + colon);
 			S.StartMultiColumn(2);
 			{
@@ -194,6 +195,13 @@ serviceSections()
 	openSongSetDirectory = gPrefs->Read(wxT("/EutychusServiceRecorder/OpenSongSetDirectory"),wxT("C:\\Users\\Public\\Documents\\OpenSong\\Sets\\"));
 	aupTemplate = gPrefs->Read(wxT("/EutychusServiceRecorder/AupTemplate"),wxT("C:\\Users\\Public\\Documents\\ServiceRecordings\\template.aup"));
 	uploadCommand = gPrefs->Read(wxT("/EutychusServiceRecorder/UploadCommand"),wxT("C:\\audio-uploader\\audio-uploader.py \"%FILE%\" \"%SECTION%\" http://stpolycarpchurch.org.uk/teaching/xmlrpc.php \"%USER%\" \"%PASSWORD%\""));
+
+	if(autoInit)
+	{
+		wxCommandEvent e;
+		onNewButtonClick(e);
+	}
+	autoInit = false;
 }
 
 void EutychusPanel::loadOpenSongSetFile()
@@ -349,16 +357,14 @@ void EutychusPanel::updateAlbumSubs()
 	subNames.Add(wxT("%COMMENTS%")); subVals.Add(readingsBox->GetValue());
 }
 
-void EutychusPanel::updateTitleSubs()
+void EutychusPanel::updateTitleSubs(const wxString& sectionName)
 {
-	if(sectionChoice->GetValue() != wxT(""))
-	{
-		int index = subNames.Index(wxT("%ALBUM%"));
-		wxString title = subVals[index];
-		index = subNames.Index(wxT("%TITLE%"));
-		title += TITLE_SEP + sectionChoice->GetValue();
-		subVals[index] = title;
-	}
+	int index = subNames.Index(wxT("%ALBUM%"));
+	wxString title = subVals[index];
+	index = subNames.Index(wxT("%TITLE%"));
+	if(sectionName != wxT(""))
+		title += TITLE_SEP + sectionName;
+	subVals[index] = title;
 }
 
 void EutychusPanel::findFreeFile()
@@ -375,11 +381,19 @@ void EutychusPanel::findFreeFile()
 	}
 }
 
+bool EutychusPanel::autoInit = false;
+
 void EutychusPanel::onNewButtonClick(wxCommandEvent &e)
 {
 	if(gAudioIO->IsBusy() || gAudioIO->IsPaused())
 	{
 		wxBell();
+		return;
+	}
+	if(aupPathName != wxEmptyString)
+	{
+		autoInit = true;
+		project->OnNew();
 		return;
 	}
 	newButton->Disable();
@@ -503,6 +517,7 @@ void EutychusPanel::loadFromMetaData()
 	}
 	if(foundDate)
 	{
+		manualTime = true;
 		wxDateTime tempDT(timeStart);
 		this->serviceStartDatePicker->SetValue(tempDT);
 		amPmChoice->SetSelection(-1);
@@ -609,18 +624,30 @@ void EutychusPanel::onSaveButtonClick(wxCommandEvent &e)
 
 	updateAlbumSubs();
 
+	bool anySet = false;
+	wxString firstUploadable = wxEmptyString;
+
 	for(std::vector<ServiceSection>::iterator iter = serviceSections.begin();
 		iter != serviceSections.end();
 		iter++)
 	{
-		if(iter->isUpload() && !(iter->isEndSet() && iter->isStartSet()))
+		if(iter->isUpload())
 		{
-			if(wxMessageBox(wxT("You have not marked the section called '") + iter->getName() + wxT("'; nothing will be uploaded. Continue?"),wxT("Upload failure"),wxCENTRE | wxYES_NO) == wxYES)
+			if(firstUploadable == wxEmptyString)
+				firstUploadable = iter->getName();
+			if(iter->isEndSet() && iter->isStartSet())
+			{
+				anySet = true;
 				break;
-			else
-				return;
+			}
 		}
 	}
+	
+	if(!anySet && wxMessageBox(
+		wxT("You have not marked the start and end of any uploadable sections, e.g. the section called \"") + firstUploadable + wxT("\"; This means nothing will be uploaded. Do you wish to continue?"),wxT("Upload failure"),
+		wxCENTRE | wxYES_NO) != wxYES)
+		return;
+
 	if(aupPathNameLast != aupPathName)
 	{
 		findFreeFile();
@@ -671,7 +698,7 @@ void EutychusPanel::onSaveButtonClick(wxCommandEvent &e)
 		ch = *(CommandHandler**)a;
 		ch->SetProject(project);
 	}
-	updateTitleSubs();
+	updateTitleSubs(wxEmptyString);
 	srt.updateProjectMetaDataTag(project,wxString(wxT("TITLE")),subNames,subVals);
 
 	gPrefs->Write(wxT("FileFormats/FLACLevel"),wxT("8"));
@@ -697,6 +724,8 @@ void EutychusPanel::onSaveButtonClick(wxCommandEvent &e)
 			}
 			else
 			{
+				updateTitleSubs(iter->getName());
+				srt.updateProjectMetaDataTag(project,wxString(wxT("TITLE")),subNames,subVals);
 				project->SelectNone();
 				project->SelectAllIfNone();
 				project->SetSel0(iter->getStart());
@@ -824,7 +853,7 @@ void EutychusPanel::onMarkSectionEndButtonClick(wxCommandEvent &e)
 	setSectionEnd( et == BAD_STREAM_TIME ? 0.0 : et );
 }
 
-void EutychusPanel::onChooseSectionComboClick(wxCommandEvent& e)
+void EutychusPanel::onSectionComboClick(wxCommandEvent& e)
 {
 	ServiceSection& sect = serviceSections[sectionChoice->GetSelection()+1];
 	if(sect.isStartSet())
@@ -880,9 +909,10 @@ void EutychusPanel::checkForNewFile()
 	{
 		loadFromMetaData();
 		loadSectionsFromLabels();
+		project->GetControlToolBar()->Enable();
 		saveButton->Enable(true);
 		sectionChoice->SetSelection(0);
-		onChooseSectionComboClick(wxCommandEvent());
+		onSectionComboClick(wxCommandEvent());
 		aupPathName = project->GetFileName();
 	}
 }
@@ -897,6 +927,16 @@ void EutychusPanel::onServiceStartDateChange(wxDateEvent& event)
 	timeStart = temp.GetTicks();
 }
 
+void EutychusPanel::onAmPmChoiceClick(wxCommandEvent& e)
+{
+	manualTime = true;
+	wxDateTime temp = serviceStartDatePicker->GetValue();
+	if(amPmChoice->GetSelection() == 1)
+		temp.SetHour(12);
+	else
+		temp.SetHour(0);
+	timeStart = temp.GetTicks();
+}
 
 void CommandHandler::SetProject(AudacityProject *proj)
 {

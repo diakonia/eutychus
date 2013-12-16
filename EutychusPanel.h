@@ -19,6 +19,8 @@ class EutychusPanel:
 protected:
 	AudacityProject* project;
 
+	static bool autoInit;
+
 	boolean manualTime;
 	time_t timeStart;
 	int instanceNo;
@@ -45,7 +47,7 @@ protected:
 	wxString tryDataDirName(int tryInstanceNo);
 	void findFreeFile();
 	void updateAlbumSubs();
-	void updateTitleSubs();
+	void updateTitleSubs(const wxString& sectionName);
 	void loadOpenSongSetFile();
 	void OnClose(wxCloseEvent& evt);
 	virtual wxThread::ExitCode Entry();
@@ -131,9 +133,10 @@ public:
 	void onSaveButtonClick(wxCommandEvent & e);
 	void onTestButtonClick(wxCommandEvent & e);
 	void onMarkSectionStartButtonClick(wxCommandEvent & e);
-	void onChooseSectionComboClick(wxCommandEvent & e);
+	void onSectionComboClick(wxCommandEvent & e);
 	void onMarkSectionEndButtonClick(wxCommandEvent & e);
 	void onServiceStartDateChange(wxDateEvent& event);
+	void onAmPmChoiceClick(wxCommandEvent & e);
 
 	void setSectionStart(double newStart);
 	void setSectionEnd(double newEnd);
