@@ -1,0 +1,68 @@
+; Edit this file as appropriate to your installation, then append to your
+; Audacity config file.
+
+[EutychusServiceRecorder]
+
+;;; ***** Folders *****
+;;; These are the different locations Eutychus fetches files from and stores
+;;; them to. Note all backslahes must be doubled up.
+
+; Where Audacity Project files get saved to:
+SaveDirectory=C:\\Users\\Public\\Documents\\ServiceRecordings\\
+
+; Where FLAC archival copies are stored to:
+ArchiveDirectory=C:\\Users\\Public\\Documents\\ServiceRecordings\\ArchivalCopies\\
+
+; Where MP3 extracts are stored ready for upload:
+UploadDirectory=C:\\Users\\Public\\Documents\\ServiceRecordings\\ToWebSite\\
+
+; Where OpenSong stores its set files. Eutychus retrieves scripture references
+; from here:
+OpenSongSetDirectory=C:\\Users\\Public\\Documents\\OpenSong\\Sets\\
+
+; The location of the template file:
+AupTemplate=C:\\Users\\Public\\Documents\\ServiceRecordings\\template.aup
+
+;;; ***** Meta-data ***** 
+ChurchName=My Church
+
+; List of different types of event: 
+EventType00=Morning Service
+EventType01=Evening Service
+EventType02=Weekday Meeting
+EventType03=Baptism
+EventType04=Wedding
+EventType05=Confirmation
+EventType06=Other
+
+; Preachers. Up to 100 can be listed. Numbers must be in sequence, two digits
+; starting from 00:
+Preacher00=Rev. A Minister
+Preacher01=Mr. B. Reader
+Preacher02=Mrs. C. Other
+Preacher03=Other
+
+; Service sections. 00 always indicates whole service.
+; the suffix must be :0 (mneaning do not upload) or :1 (meaning do upload).
+ServiceSections00=Whole Service:0
+ServiceSections01=Sermon:1
+ServiceSections02=Sermon Part 1:1
+ServiceSections03=Sermon Part 2:1
+ServiceSections04=Sermon Part 3:1
+ServiceSections05=Opening Worship:0
+ServiceSections06=First Reading:0
+ServiceSections07=Second Reading:0
+ServiceSections08=Third Reading:0
+ServiceSections09=Worship:0
+ServiceSections10=Intercessions:0
+ServiceSections11=Communion:0
+ServiceSections12=Closing Worship:0
+ServiceSections13=Other:0
+
+;;; Upload Command
+; The command used to actually do the upload. By default Eutychus uses 
+; audio-uploader from https://github.com/sgparry/wp-audio-uploader
+; You must set the URL of your church site, the WordPress user to use to post
+; and the password.
+UploadCommand=python C:\\development\\audio-uploader\\audio-uploader.py "%FILE%" http://yourchurch.org/wp-site/xmlrpc.php "UserA" "secret"
+

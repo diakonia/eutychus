@@ -37,7 +37,34 @@ Once you have the cloned the Audacity repo you should then clone the Eutychus
 repo to <AUDACITY_SOURCE>\lib-src\mod-eutychus-service-recorder. The Visual C++
 project file should be added to the main solution and the whole solution built.
 
+3. Installation
+
+A)
+Make sure the version of Audacity you have installed matches Eutychus. All
+Eutychus releases have a four digit version number. The first three must match
+the Audacity version.
+
+B)
+Copy:
+%AUDACITY_DEV_HOME%\win\Unicode Release\Modules\mod-eutychus-service-recorder.dll
+or the releases are
+To:
+%AUDACITY_HOME%\Modules\
+
+C)
+Install wp-audio-uploader (https://github.com/sgparry/wp-audio-uploader) and its
+dependencies as per https://github.com/sgparry/wp-audio-uploader/README.txt
+
+D)
+Install support files as directed by:
+%AUDACITY_DEV_HOME%\win\Unicode Release\Modules\SupportFiles\README.txt
+
 3. Known Issues
+
+Configuration is by editing the audacity.cfg. Future release will include
+a configuration screen.
+
+The church logo is currently hardcoded (Sorry!).
 
 Eutychus needs to be compiled to a specfic version of Audacity. Future releases 
 will always break compatbility. Furthermore, as of writing (Audacity 2.0.5)
