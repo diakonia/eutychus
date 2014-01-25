@@ -40,7 +40,6 @@ protected:
 
 public:
 	bool parse(wxString& fname);
-	bool writeOut(wxString& fname, wxArrayString& subNames, wxArrayString& subValues);
 	void updateProject( AudacityProject * proj, wxArrayString &subNames, wxArrayString &subValues);
 	void updateProjectMetaDataTag( AudacityProject * proj, wxString& tagName, wxArrayString &subNames, wxArrayString &subValues);
 	EutychusTemplate(void);

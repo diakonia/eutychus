@@ -8,19 +8,15 @@
 #include <wx/wfstream.h>
 #include <wx/sstream.h>
 #include <wx/txtstrm.h>
-#include <wx/thread.h>
 #include <wx/datetime.h>
 #include <wx/debug.h>
-#include "../xml/XMLTagHandler.h"
 #include "Registrar.h"
 #include "../AudioIO.h"
 #include "toolbars/ControlToolBar.h"
 #include "../Tags.h"
 #include "EutychusTrackPanel.h"
-#include "../commands/AppCommandEvent.h"
-#include "../commands/ScriptCommandRelay.h"
 #include "EutychusResImage.h"
-#include "../commands/CommandHandler.h"
+#include "../export/export.h"
 
 IMPLEMENT_CLASS( EutychusPanel, wxPanel );
 
@@ -52,30 +48,6 @@ EVT_CHOICE(amPmChoiceID,EutychusPanel::onAmPmChoiceClick)
 EVT_DATE_CHANGED(serviceStartDatePickerID,EutychusPanel::onServiceStartDateChange)
 EVT_CLOSE(EutychusPanel::OnClose)
 END_EVENT_TABLE()
-
-#if 0
-wxString EutychusPanel::EutychusCommandType::BuildName()
-{
-   return wxT("ESRProjectClose");
-}
-
-void EutychusPanel::EutychusCommandType::BuildSignature(CommandSignature &signature)
-{
-}
-
-Command *EutychusPanel::EutychusCommandType::Create(CommandOutputTarget *target)
-{
-   return new EutychusCommand(*this, target);
-}
-
-bool EutychusPanel::EutychusCommand::Apply(CommandExecutionContext context)
-{
-   return true;
-}
-
-EutychusPanel::EutychusCommand::~EutychusCommand()
-{ }
-#endif
 
 bool EutychusPanel::createPanelInhibited = false;
 
@@ -398,15 +370,19 @@ void EutychusPanel::onNewButtonClick(wxCommandEvent &e)
 	}
 	newButton->Disable();
 	time(&timeStart);
-	EutychusTemplate srt;
-	srt.parse(aupTemplate);
+   project = GetActiveProject();
+
 	findFreeFile();
 	updateAlbumSubs();
 
-	wxMkDir(saveDirectory + projName + wxT("_data"));
-	srt.writeOut(aupPathName,subNames,subVals);
+   project->SaveAs(aupPathName,false,true);
 
-	project->OpenFile(aupPathName);
+   EutychusTemplate srt;
+	srt.parse(aupTemplate);
+	srt.updateProject(project,subNames,subVals);
+
+   project->Save();
+
 	sectionChoice->SetSelection(0);
 	project->GetControlToolBar()->Enable();
 	saveButton->Enable();
@@ -558,7 +534,6 @@ void EutychusPanel::loadFromMetaData()
 	{
 		readingsBox->SetValue(comments);
 	}
-//	prevProjectPathName = project->GetFileName();
 }
 
 void EutychusPanel::loadSectionsFromLabels()
@@ -652,51 +627,20 @@ void EutychusPanel::onSaveButtonClick(wxCommandEvent &e)
 	{
 		findFreeFile();
 		updateAlbumSubs();
-		wxString dirNameNew = saveDirectory + projName + wxT("_data");
 		srt.updateProject(project,subNames,subVals);
-		project->Save();
-		app->ProcessPendingEvents();
-		app->Yield();
-		createPanelInhibited = true;
-		project->OnNew();
-		createPanelInhibited = false;
-		AudacityProject* project2 = GetActiveProject();
-		Reparent(project2);
-		CommandHandler* ch;
-		DWORD a = (DWORD)((void*)app)+0x70;
-		ch = *(CommandHandler**)a;
-		ch->SetProject(project2);
-		((EutychusTrackPanel*)(project->GetTrackPanel()))->detachEutychusPanel();
-		project->OnClose();
-		app->ProcessPendingEvents();
-		app->Yield();
-		project = project2;
-
-//		wxRenameFile(aupPathNameLast,aupPathName);
-		transformFile(aupPathNameLast,aupPathName,
-			wxT("\"") + projNameLast + wxT("_data\""),
-			wxT("\"") + projName + wxT("_data\""));
-		wxRemoveFile(aupPathNameLast);
-		wxRenameFile(dirNameLast,dirNameNew);
-		project->OpenFile(aupPathName);
-		app->ProcessPendingEvents();
-		app->Yield();
-		Reparent(project);
-		(dynamic_cast<EutychusTrackPanel*>(project->GetTrackPanel()))->attachEutychusPanel(this);
-		app->ProcessPendingEvents();
-		app->Yield();
-		project->Layout();
-		app->ProcessPendingEvents();
-		app->Yield();
+		if(project->SaveAs(aupPathName,false,true))
+		{
+			if(wxFileExists(aupPathNameLast))
+			{
+				wxRemoveFile(aupPathNameLast);
+				wxRmDir(dirNameLast);
+			}
+		}
 	}
 	else
 	{
 		srt.updateProject(project,subNames,subVals);
 		project->Save();
-		CommandHandler* ch;
-		DWORD a = (DWORD)((void*)app)+0x70;
-		ch = *(CommandHandler**)a;
-		ch->SetProject(project);
 	}
 	updateTitleSubs(wxEmptyString);
 	srt.updateProjectMetaDataTag(project,wxString(wxT("TITLE")),subNames,subVals);
@@ -705,7 +649,7 @@ void EutychusPanel::onSaveButtonClick(wxCommandEvent &e)
 	gPrefs->Write(wxT("FileFormats/FLACBitDepth"),wxT("24"));
 	if(wxFileExists(archivePathName))
 		wxRemoveFile(archivePathName);
-	if(!threadExecuteExport(EXPORT_ARCHIVAL))
+	if(!executeExport(EXPORT_ARCHIVAL))
 		return;
 
 	for(std::vector<ServiceSection>::iterator iter = serviceSections.begin();
@@ -719,7 +663,7 @@ void EutychusPanel::onSaveButtonClick(wxCommandEvent &e)
 				wxRemoveFile(pathName);
 			if(iter == serviceSections.begin())
 			{
-				if(!threadExecuteExport(EXPORT_ALL,&(*iter)))
+				if(!executeExport(EXPORT_ALL,&(*iter)))
 					return;
 			}
 			else
@@ -733,7 +677,7 @@ void EutychusPanel::onSaveButtonClick(wxCommandEvent &e)
 				project->RedrawProject();
 				project->ProcessPendingEvents();
 				wxYieldIfNeeded();
-				if(!threadExecuteExport(EXPORT_EXTRACT,&(*iter)))
+				if(!executeExport(EXPORT_EXTRACT,&(*iter)))
 					return;
 			}
 		}
@@ -760,34 +704,33 @@ void EutychusPanel::onSaveButtonClick(wxCommandEvent &e)
 	newButton->Enable();
 }
 
-bool EutychusPanel::threadExecuteExport(EutychusPanel::ThreadAction threadAction, EutychusPanel::ServiceSection* extractSection)
+bool EutychusPanel::executeExport(EutychusPanel::ExportAction exportAction, EutychusPanel::ServiceSection* extractSection)
 {
-	this->threadAction  = threadAction;
-	this->extractSection  = extractSection;
-	if (wxThreadHelper::Create() != wxTHREAD_NO_ERROR)
+	Exporter exporter;
+	double t0, t1;
+	wxString fileType =
+		(exportAction==EutychusPanel::EXPORT_ARCHIVAL) ?
+		wxT("FLAC") : wxT("MP3");
+	wxString fileName =
+		(exportAction == EXPORT_ARCHIVAL) ? 
+		archivePathName : getExtractPathName(extractSection->getName());
+
+	if(exportAction == EutychusPanel::EXPORT_ALL || exportAction == EutychusPanel::EXPORT_ARCHIVAL)
 	{
-		wxLogError(wxT("Could not create the worker thread!"));
-		return false;
+		t0 = 0.0;
+		t1 = project->GetTracks()->GetEndTime();
 	}
-	// go!
-	if (GetThread()->Run() != wxTHREAD_NO_ERROR)
+	else
 	{
-		wxLogError(wxT("Could not run the worker thread!"));
-		return false;
+		t0 = extractSection->getStart();
+		t1 = extractSection->getEnd();
 	}
-	if(GetThread()->Wait() != (wxThread::ExitCode)0)
-	{
-		wxMessageBox(wxT("Export failed or was cancelled"),wxT("Export"));
-		return false;
-	}
-	return true;
+	return exporter.Process(project,2,fileType,fileName,false,t0,t1);
+
 }
 
 void EutychusPanel::onTestButtonClick(wxCommandEvent &e)
 {
-	wxString output;
-	wxString command = wxT("Message: MessageString=hello");
-	ExecCommand( &command, &output);
 }
 
 static wxString TimeElapsed2Text(double te)
@@ -873,33 +816,12 @@ wxString EutychusPanel::getExtractPathName(wxString& sectionName)
 	return uploadDirectory + rawProjName + wxT("-") + s + wxT("-mp3.mp3");
 }
 
-wxThread::ExitCode EutychusPanel::Entry()
-{
-	wxString output;
-	wxString portion = (threadAction != EXPORT_EXTRACT) ? wxT("All") : wxT("Selection");
-	wxString fileName = (threadAction == EXPORT_ARCHIVAL) ? archivePathName : getExtractPathName(extractSection->getName());
-	wxString channels = (threadAction != EXPORT_EXTRACT) ? wxT("1") : wxT("2");
-	wxString command = wxT("Export: Mode=") + portion + wxT(" Filename=") + fileName + wxT(" Channels=") + channels +  wxT("\n");
-	ExecCommand( &command, &output);
-	if(!output.EndsWith(wxT("Export finished: OK\n")))
-	{
-		return (wxThread::ExitCode)-99;
-	}
-	return (wxThread::ExitCode)0;
-}
-
 EutychusPanel::~EutychusPanel(void)
 {
 }
 
 void EutychusPanel::OnClose(wxCloseEvent&)
 {
-	// important: before terminating, we _must_ wait for our joinable
-	// thread to end, if it's running; in fact it uses variables of this
-	// instance and posts events to *this event handler
-	if (GetThread() && // DoStartALongTask() may have not been called
-		GetThread()->IsRunning())
-		GetThread()->Wait();
 	Destroy();
 }
 
@@ -936,10 +858,5 @@ void EutychusPanel::onAmPmChoiceClick(wxCommandEvent& e)
 	else
 		temp.SetHour(0);
 	timeStart = temp.GetTicks();
-}
-
-void CommandHandler::SetProject(AudacityProject *proj)
-{
-   mCurrentContext->proj = proj;
 }
 

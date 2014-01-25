@@ -13,8 +13,7 @@
 #include "../Commands/CommandType.h"
 
 class EutychusPanel:
-	public wxPanel,
-	public wxThreadHelper
+	public wxPanel
 {
 protected:
 	AudacityProject* project;
@@ -50,7 +49,6 @@ protected:
 	void updateTitleSubs(const wxString& sectionName);
 	void loadOpenSongSetFile();
 	void OnClose(wxCloseEvent& evt);
-	virtual wxThread::ExitCode Entry();
 	OpenSongSetFile* openSongSetFile;
 
 	wxDatePickerCtrl* serviceStartDatePicker;
@@ -106,15 +104,15 @@ protected:
 		boolean isUpload() { return upload; }
 	};
 
-	enum ThreadAction {
+	enum ExportAction {
 		EXPORT_ARCHIVAL,
 		EXPORT_ALL,
 		EXPORT_EXTRACT
-	} threadAction;
+	} exportAction;
 	
 	ServiceSection* extractSection;
 
-	bool threadExecuteExport(ThreadAction threadAction, ServiceSection* extractSection=NULL);
+	bool executeExport(ExportAction exportAction, ServiceSection* extractSection=NULL);
 
 	std::vector<ServiceSection> serviceSections;
 
